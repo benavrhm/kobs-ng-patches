@@ -1,0 +1,148 @@
+# This patch to kobs-ng allows you to specify the ROM version explicitly using a
+# command line parameter. For example "kobs-ng -r mx28 init ...".
+#
+# Using this patch allows you to avoid the broken heuristic on /proc/cpuinfo
+# in src/plat_boot_config.c:discover_boot_rom_version(). There is in fact no
+# connection between the content of /proc/cpuinfo and the SoC ROM version,
+# except in some particular kernel versions distributed by Freescale.
+#
+# This patch was made for version kobs-ng-3.0.35-4.0.0 that is used in
+# buildroot-2013.11.
+#
+# I place this patch in the public domain in the hope that it will be useful,
+# but there is no warranty. You use this patch at your own risk.
+# Jonathan Ben-Avraham <yba@tkos.co.il>
+#
+--- old/src/plat_boot_config.c	2012-12-18 08:37:40.000000000 +0200
++++ new/src/plat_boot_config.c	2014-01-07 19:54:56.326068317 +0200
+@@ -28,7 +28,7 @@
+ /* System version */
+ platform_config *plat_config_data;
+ 
+-static platform_config mx23_boot_config = {
++platform_config mx23_boot_config = {
+ 	.m_u32RomVer = ROM_Version_0,
+ 	.m_u32EnDISBBM = 0,
+ 	.m_u32EnSoftEcc = 0,
+@@ -41,7 +41,7 @@
+ 	.rom_mtd_commit_structures = v0_rom_mtd_commit_structures,
+ };
+ 
+-static platform_config mx28_boot_config = {
++platform_config mx28_boot_config = {
+ 	.m_u32RomVer = ROM_Version_1,
+ 	.m_u32EnDISBBM = 0,
+ 	.m_u32EnSoftEcc = 1,
+@@ -54,7 +54,7 @@
+ 	.rom_mtd_commit_structures = v1_rom_mtd_commit_structures,
+ };
+ 
+-static platform_config mx53to1_boot_config = {
++platform_config mx53to1_boot_config = {
+ 	.m_u32RomVer = ROM_Version_2,
+ 	.m_u32EnDISBBM = 0,
+ 	.m_u32EnSoftEcc = 0,
+@@ -67,7 +67,7 @@
+ 	.rom_mtd_commit_structures = v2_rom_mtd_commit_structures,
+ };
+ 
+-static platform_config mx53to2_boot_config = {
++platform_config mx53to2_boot_config = {
+ 	.m_u32RomVer = ROM_Version_2,
+ 	.m_u32EnDISBBM = 1,
+ 	.m_u32EnSoftEcc = 0,
+@@ -80,7 +80,7 @@
+ 	.rom_mtd_commit_structures = v2_rom_mtd_commit_structures,
+ };
+ 
+-static platform_config mx50_boot_config = {
++platform_config mx50_boot_config = {
+ 	.m_u32RomVer = ROM_Version_3,
+ 	.m_u32EnDISBBM = 0,
+ 	.m_u32EnSoftEcc = 1,
+@@ -93,7 +93,7 @@
+ 	.rom_mtd_commit_structures = v4_rom_mtd_commit_structures,
+ };
+ 
+-static platform_config mx6q_boot_config = {
++platform_config mx6q_boot_config = {
+ 	.m_u32RomVer = ROM_Version_3,
+ 	.m_u32EnDISBBM = 0,
+ 	.m_u32EnBootStreamVerify = 0,
+--- old/src/main.c	2012-12-18 08:37:40.000000000 +0200
++++ new/src/main.c	2014-01-08 11:24:40.306074239 +0200
+@@ -67,7 +67,8 @@
+ 			VERSION_MAJOR, VERSION_MINOR, git_sha);
+ 	printf("ROM Version %d\n", plat_config_data->m_u32RomVer);
+ 	printf(
+-	"usage: kobs-ng [COMMAND] [ARGS]\n"
++	"usage: kobs-ng [-r <ROM version>] [COMMAND] [ARGS]\n"
++	"Where <ROM version> is one of: mx23 mx28 mx50 mx53to1 mx53to2 mx6q\n"
+ 	"Where [COMMAND] is one of:\n"
+ 	"\n"
+ 	"  dump [-v] [KOBS] ........................ Verify/dump boot structures\n"
+@@ -830,17 +831,43 @@
+ {
+ 	int ret;
+ 
+-	ret = discover_boot_rom_version();
+-	if (ret != 0) {
+-		printf("We can not find the right ROM version!\n");
+-		exit(1);
+-	}
+-
+ 	if (argc < 2)
+ 		usage();
+ 	argc--;
+ 	argv++;
+ 
++	if (strcmp(argv[0], "-r") == 0) {
++		if (argc < 2)
++			usage();
++		argc--;
++		argv++;
++		if (strcmp(argv[0], "mx23") == 0) {
++			plat_config_data = &mx23_boot_config;
++		} else if (strcmp(argv[0], "mx28") == 0) {
++			plat_config_data = &mx28_boot_config;
++		} else if (strcmp(argv[0], "mx50") == 0) {
++			plat_config_data = &mx50_boot_config;
++		} else if (strcmp(argv[0], "mx53to1") == 0) {
++			plat_config_data = &mx53to1_boot_config;
++		} else if (strcmp(argv[0], "mx53to2") == 0) {
++			plat_config_data = &mx53to1_boot_config;
++		} else if (strcmp(argv[0], "mx6q") == 0) {
++			plat_config_data = &mx6q_boot_config;
++		} else
++			usage();
++		argc--;
++		argv++;
++	}
++	else {
++		ret = discover_boot_rom_version();
++		if (ret != 0) {
++			printf("We can not find the right ROM version!\n");
++			exit(1);
++		}
++	}
++	if (0 == argc )
++		usage();
++
+ 	if (strcmp(argv[0], "dump") == 0)
+ 		return dump_main(argc, argv);
+ 
+--- old/src/plat_boot_config.h	2012-12-18 08:37:40.000000000 +0200
++++ new/src/plat_boot_config.h	2014-01-07 19:58:14.414072497 +0200
+@@ -59,6 +59,12 @@
+ } platform_config;
+ 
+ extern platform_config *plat_config_data;
++extern platform_config mx23_boot_config;
++extern platform_config mx28_boot_config;
++extern platform_config mx50_boot_config;
++extern platform_config mx53to1_boot_config;
++extern platform_config mx53to2_boot_config;
++extern platform_config mx6q_boot_config;
+ 
+ extern int discover_boot_rom_version(void);
+ 
