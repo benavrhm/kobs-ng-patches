@@ -2,9 +2,15 @@
 # command line parameter. For example "kobs-ng -r mx28 init ...".
 #
 # Using this patch allows you to avoid the broken heuristic on /proc/cpuinfo
-# in src/plat_boot_config.c:discover_boot_rom_version(). There is in fact no
-# connection between the content of /proc/cpuinfo and the SoC ROM version,
-# except in some particular kernel versions distributed by Freescale.
+# in src/plat_boot_config.c:discover_boot_rom_version() that results in the
+# lame message:
+#
+# "Couldn't find Boot ROM version
+# We can not find the right ROM version!"
+#
+# There is in fact no connection between the content of /proc/cpuinfo and the
+# SoC ROM version, except in some particular versions of the kernel that were
+# distributed by Freescale some time ago.
 #
 # This patch was made for version kobs-ng-3.0.35-4.0.0 that is used in
 # buildroot-2013.11.
